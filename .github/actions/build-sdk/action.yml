@@ -16,6 +16,9 @@ runs:
         sudo mkdir -p /opt/swift
         sudo tar -xzf swift.tar.gz -C /opt/swift --strip-components=2
         echo "/opt/swift/bin" >> "$GITHUB_PATH"
+        # SwiftPM derives its toolchain bin dir from argv[0]; pin it so
+        # `--package-path` (which changes cwd) cannot resolve <pkg>/swiftc.
+        echo "SWIFTPM_CUSTOM_BIN_DIR=/opt/swift/bin" >> "$GITHUB_ENV"
 
     - name: Configure ccache
       shell: bash
@@ -88,13 +91,14 @@ runs:
 
     - name: Test host tooling
       shell: bash
-      run: swift test --package-path sdk/tooling
+      run: |
+        "$(command -v swift)" test --package-path sdk/tooling
 
     - name: Build portable SDK bundle
       shell: bash
       run: |
         sdk/esp-sdk bundle --target "$IDF_TARGET"
-        swift sdk install "sdk/build/${SDK_ID}.tar.gz"
+        "$(command -v swift)" sdk install "sdk/build/${SDK_ID}.tar.gz"
 
     - name: Verify bundle portability
       shell: bash
@@ -124,7 +128,7 @@ runs:
     - name: Smoke-test cross-compilation (package)
       shell: bash
       run: |
-        swift build -c release --swift-sdk "$SDK_ID" --build-system native
+        "$(command -v swift)" build -c release --swift-sdk "$SDK_ID" --build-system native
         test -f .build/riscv32-none-none-eabi/release/Modules/ESPBindings.swiftmodule
 
     - name: Smoke-test cross-compilation (consumer app)
@@ -157,7 +161,7 @@ runs:
             Logger(label: "ci").info("boot")
         }
         EOF
-        swift build -c release --swift-sdk "$SDK_ID" --build-system native
+        "$(command -v swift)" build -c release --swift-sdk "$SDK_ID" --build-system native
         test -f .build/riscv32-none-none-eabi/release/libApp.a
 
     # Build the real, flashable example (WS2812 over RMT). This catches

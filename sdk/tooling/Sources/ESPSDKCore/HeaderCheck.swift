@@ -24,15 +24,43 @@ public enum HeaderCheck {
         try FileOps.write(Templates.probeSource, to: FileOps.join(probeDirectory, "Probe.swift"))
 
         print("building header probe with SDK '\(sdk)'...")
+
+        var arguments = [
+            "build",
+            "--package-path", temporary,
+            "--configuration", "release",
+            "--swift-sdk", sdk,
+            "--build-system", "native",
+        ]
+        let executable: String
+        if let swift = ExecutableLookup.path(named: "swift") {
+            executable = swift
+        } else {
+            executable = "/usr/bin/env"
+            arguments.insert("swift", at: 0)
+        }
+
+        // Resolve the real compiler: on swiftly installs `swiftc` on PATH is a
+        // proxy, and pinning SWIFTPM_CUSTOM_BIN_DIR to the proxy breaks it.
+        var swiftcPath = ExecutableLookup.path(named: "swiftc")
+        if let swiftly = ExecutableLookup.path(named: "swiftly"),
+            let resolved = try? await ProcessRunner.run(swiftly, ["run", "which", "swiftc"]),
+            resolved.succeeded
+        {
+            let candidate = resolved.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !candidate.isEmpty { swiftcPath = candidate }
+        }
+
+        var toolchainEnvironment: [String: String] = [:]
+        if let swiftcPath {
+            toolchainEnvironment["SWIFTPM_CUSTOM_BIN_DIR"] =
+                (swiftcPath as NSString).deletingLastPathComponent
+        }
+
         let result = try await ProcessRunner.run(
-            "/usr/bin/env",
-            [
-                "swift", "build",
-                "--package-path", temporary,
-                "--configuration", "release",
-                "--swift-sdk", sdk,
-                "--build-system", "native",
-            ]
+            executable,
+            arguments,
+            environment: toolchainEnvironment
         )
 
         if !result.stdout.isEmpty { print(result.stdout, terminator: "") }

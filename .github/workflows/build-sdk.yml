@@ -72,6 +72,7 @@ jobs:
           curl -fLo swift.pkg "https://download.swift.org/swift-${SWIFT_VERSION}-release/xcode/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-osx.pkg"
           sudo installer -pkg swift.pkg -target /
           echo "/Library/Developer/Toolchains/swift-${SWIFT_VERSION}-RELEASE.xctoolchain/usr/bin" >> "$GITHUB_PATH"
+          echo "SWIFTPM_CUSTOM_BIN_DIR=/Library/Developer/Toolchains/swift-${SWIFT_VERSION}-RELEASE.xctoolchain/usr/bin" >> "$GITHUB_ENV"
 
       - name: Resolve macOS SDK
         id: macos-sdk
@@ -142,10 +143,11 @@ jobs:
 
       - name: Install Ubuntu-built SDK bundle
         run: |
-          swift sdk install "sdk/build/${SDK_ID}.tar.gz"
+          "$(command -v swift)" sdk install "sdk/build/${SDK_ID}.tar.gz"
 
       - name: Test host tooling
-        run: swift test --package-path sdk/tooling
+        run: |
+          "$(command -v swift)" test --package-path sdk/tooling
 
       - name: Header/module coverage probe
         run: |
@@ -153,7 +155,7 @@ jobs:
 
       - name: Smoke-test cross-compilation (package)
         run: |
-          swift build -c release --swift-sdk "$SDK_ID" --build-system native
+          "$(command -v swift)" build -c release --swift-sdk "$SDK_ID" --build-system native
           test -f .build/riscv32-none-none-eabi/release/Modules/ESPBindings.swiftmodule
 
       - name: Smoke-test cross-compilation (consumer app)
@@ -185,7 +187,7 @@ jobs:
               Logger(label: "ci").info("boot")
           }
           EOF
-          swift build -c release --swift-sdk "$SDK_ID" --build-system native
+          "$(command -v swift)" build -c release --swift-sdk "$SDK_ID" --build-system native
           test -f .build/riscv32-none-none-eabi/release/libApp.a
 
       - name: Configure ccache

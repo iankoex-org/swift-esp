@@ -6,4 +6,17 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 cd "$ROOT"
-exec swift run --package-path "$ROOT/sdk/tooling" -c release esp-sdk "$@"
+# SwiftPM derives its toolchain bin dir from argv[0] relative to cwd. A
+# PATH-invoked "swift" plus --package-path can therefore look for
+# <package>/swiftc. Resolve both absolutely and pin the bin dir.
+SWIFT_BIN=$(command -v swift)
+SWIFTC_BIN=""
+if command -v swiftly >/dev/null 2>&1; then
+  SWIFTC_BIN=$(swiftly run which swiftc 2>/dev/null || true)
+fi
+if [ -z "$SWIFTC_BIN" ]; then
+  SWIFTC_BIN=$(command -v swiftc)
+fi
+SWIFTPM_CUSTOM_BIN_DIR=$(dirname "$SWIFTC_BIN")
+export SWIFTPM_CUSTOM_BIN_DIR
+exec "$SWIFT_BIN" run --package-path "$ROOT/sdk/tooling" -c release esp-sdk "$@"

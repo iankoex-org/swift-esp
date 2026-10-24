@@ -164,6 +164,11 @@ struct IncludeTests {
 
 @Suite("File operations")
 struct FileOpsTests {
+    @Test("Executable lookup returns an absolute path")
+    func executableLookup() {
+        #expect(ExecutableLookup.path(named: "sh")?.hasPrefix("/") == true)
+    }
+
     @Test("copyTree dereferences symlinks and merges directories")
     func copyTree() throws {
         let root = try temporaryDirectory()
