@@ -92,7 +92,11 @@ runs:
     - name: Test host tooling
       shell: bash
       run: |
-        "$(command -v swift)" test --package-path sdk/tooling
+        # Swift 6.4 defaults to the Swift Build backend, which cannot locate
+        # swiftc in this toolchain layout (/opt/swift/bin rather than
+        # /opt/swift/usr/bin). The native backend uses the pinned compiler
+        # path directly.
+        "$(command -v swift)" test --package-path sdk/tooling --build-system native
 
     - name: Build portable SDK bundle
       shell: bash

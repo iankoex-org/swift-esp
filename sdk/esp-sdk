@@ -9,6 +9,10 @@ cd "$ROOT"
 # SwiftPM derives its toolchain bin dir from argv[0] relative to cwd. A
 # PATH-invoked "swift" plus --package-path can therefore look for
 # <package>/swiftc. Resolve both absolutely and pin the bin dir.
+#
+# Swift 6.4's default Swift Build backend still cannot locate swiftc when the
+# toolchain is installed as <root>/bin instead of <root>/usr/bin, so force the
+# native backend for the host-tooling build.
 SWIFT_BIN=$(command -v swift)
 SWIFTC_BIN=""
 if command -v swiftly >/dev/null 2>&1; then
@@ -19,4 +23,4 @@ if [ -z "$SWIFTC_BIN" ]; then
 fi
 SWIFTPM_CUSTOM_BIN_DIR=$(dirname "$SWIFTC_BIN")
 export SWIFTPM_CUSTOM_BIN_DIR
-exec "$SWIFT_BIN" run --package-path "$ROOT/sdk/tooling" -c release esp-sdk "$@"
+exec "$SWIFT_BIN" run --package-path "$ROOT/sdk/tooling" -c release --build-system native esp-sdk "$@"
