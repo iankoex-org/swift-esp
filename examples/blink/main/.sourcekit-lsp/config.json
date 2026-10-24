@@ -1,0 +1,5 @@
+{
+  "swiftPM": {
+    "swiftSDK": "swift-6.4.1_esp32c6-idf6.1-0.1.0"
+  }
+}

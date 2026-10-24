@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+sdk/build/
+*.xcodeproj
+.DS_Store
+__cmake_systeminformation/
+.cache/neocmakelsp/
+*sdkconfig*
+
+# keep example build configuration
+!examples/*/sdkconfig.defaults

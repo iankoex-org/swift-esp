@@ -1,0 +1,2 @@
+# Blink does not use Wi-Fi; excluding it removes the Wi-Fi/WPA components.
+CONFIG_ESP_WIFI_ENABLED=n

@@ -1,0 +1,255 @@
+name: Build Swift SDK bundles
+
+# Builds portable ESP32 Swift SDK bundles on Blacksmith Ubuntu runners. Those
+# are the artifacts that get published. The esp32c6 bundle is additionally
+# installed and tested on a Blacksmith macOS 27 runner to validate the
+# host-independent bundle on a second OS. esp32c6 and esp32c3 are built by
+# separate jobs so the macOS validation can start as soon as esp32c6 is ready.
+# Tag pushes create a GitHub release containing only the Ubuntu-built bundles.
+
+on:
+  push:
+    branches: [main]
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-esp32c6:
+    name: esp32c6 (Ubuntu)
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    env:
+      IDF_TARGET: esp32c6
+      ESP_TOOLS: /tmp/esp
+      SWIFT_VERSION: "6.4.1"
+      SDK_ID: swift-6.4.1_esp32c6-idf6.1-0.1.0
+      ARTIFACT_NAME: esp32c6-swift-6.4.1-idf6.1-ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-sdk
+        with:
+          target: esp32c6
+
+  build-esp32c3:
+    name: esp32c3 (Ubuntu)
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    env:
+      IDF_TARGET: esp32c3
+      ESP_TOOLS: /tmp/esp
+      SWIFT_VERSION: "6.4.1"
+      SDK_ID: swift-6.4.1_esp32c3-idf6.1-0.1.0
+      ARTIFACT_NAME: esp32c3-swift-6.4.1-idf6.1-ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-sdk
+        with:
+          target: esp32c3
+
+
+  # Validate the Ubuntu-built esp32c6 bundle on macOS. Nothing built or uploaded
+  # here is published; this job exists to catch macOS-only host behaviour.
+  test-macos:
+    name: blacksmith-6vcpu-macos-27 / esp32c6 (Ubuntu-built SDK)
+    runs-on: blacksmith-6vcpu-macos-27
+    needs: build-esp32c6
+    env:
+      IDF_TARGET: esp32c6
+      ESP_TOOLS: /tmp/esp
+      SWIFT_VERSION: "6.4.1"
+      SDK_ID: swift-6.4.1_esp32c6-idf6.1-0.1.0
+      ARTIFACT_NAME: esp32c6-swift-6.4.1-idf6.1-ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Ubuntu-built ESP32-C6 SDK
+        uses: actions/download-artifact@v4
+        with:
+          name: "${{ env.ARTIFACT_NAME }}"
+          path: sdk/build
+
+      - name: Install Swift toolchain (macOS)
+        run: |
+          curl -fLo swift.pkg "https://download.swift.org/swift-${SWIFT_VERSION}-release/xcode/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-osx.pkg"
+          sudo installer -pkg swift.pkg -target /
+          echo "/Library/Developer/Toolchains/swift-${SWIFT_VERSION}-RELEASE.xctoolchain/usr/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve macOS SDK
+        id: macos-sdk
+        run: echo "path=$(xcrun --show-sdk-path)" >> "$GITHUB_OUTPUT"
+
+      # EIM accepts Python >=3.10, <3.15. On this image the preinstalled
+      # /opt/homebrew/bin/python3 is 3.15 (rejected), the setup-python
+      # toolcache is a dangling framework symlink, and /usr/bin/python3 is
+      # 3.9.6. Install a pinned 3.14 and put a real python3 shim first.
+      - name: Install Python 3.14 for EIM (macOS)
+        run: |
+          brew install python@3.14
+          PYTHON_BIN="$(brew --prefix python@3.14)/bin/python3.14"
+          test -x "$PYTHON_BIN"
+          "$PYTHON_BIN" --version
+          mkdir -p "$RUNNER_TEMP/python3-bin"
+          ln -sf "$PYTHON_BIN" "$RUNNER_TEMP/python3-bin/python3"
+          echo "$RUNNER_TEMP/python3-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/python3-bin/python3" --version
+
+      # EIM reuses tools whose installed version matches, so this cache skips
+      # downloading and decompressing the large GCC and clang archives.
+      - name: Cache ESP-IDF tools
+        uses: actions/cache@v4
+        with:
+          path: /tmp/esp
+          key: eim-tools-${{ runner.os }}-${{ runner.arch }}-esp32c6-py314-v0.20.1-idf6.1-v1
+          restore-keys: |
+            eim-tools-${{ runner.os }}-${{ runner.arch }}-esp32c6-py314-v0.20.1-idf6.1-
+
+      - name: Install ESP-IDF v6.1
+        shell: bash
+        env:
+          SDKROOT: ${{ steps.macos-sdk.outputs.path }}
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 -c 'import sys; assert (3, 10) <= sys.version_info[:2] <= (3, 14), sys.version'
+          brew install dfu-util cmake ninja ccache libgcrypt glib pixman sdl2 libslirp
+          curl -fsSL "https://github.com/espressif/idf-im-ui/releases/download/v0.20.1/eim-cli-macos-aarch64.zip" \
+            -o "$RUNNER_TEMP/eim.zip"
+          unzip -q -o "$RUNNER_TEMP/eim.zip" -d "$RUNNER_TEMP/eim"
+          chmod +x "$RUNNER_TEMP/eim/eim"
+          "$RUNNER_TEMP/eim/eim" install \
+            -i v6.1 \
+            -t "$IDF_TARGET" \
+            -p "$RUNNER_TEMP/esp/idf" \
+            --tool-install-folder-name /tmp/esp \
+            --activation-script-path-override "$HOME/.espressif/tools" \
+            --esp-idf-json-path "$HOME/.espressif/tools" \
+            --idf-tools riscv32-esp-elf,esp-rom-elfs \
+            --idf-features core \
+            --cleanup true \
+            --skip-components-download true \
+            --do-not-track true \
+            -n true \
+            -r true
+          ACTIVATE="$HOME/.espressif/tools/activate_idf_v6.1.sh"
+          ENV_OUT="$("$ACTIVATE" -e)"
+          IDF_PATH="$(printf '%s\n' "$ENV_OUT" | sed -n 's/^IDF_PATH=//p')"
+          IDF_PATH_LINE="$(printf '%s\n' "$ENV_OUT" | sed -n 's/^PATH=//p')"
+          test -n "$IDF_PATH"
+          test -n "$IDF_PATH_LINE"
+          printf '%s\n' "$ENV_OUT" | grep -v -E '^(PATH|SYSTEM_PATH)=' >> "$GITHUB_ENV" || true
+          printf 'PATH=%s/tools:%s:%s\n' "$IDF_PATH" "$IDF_PATH_LINE" "$PATH" >> "$GITHUB_ENV"
+          echo "IDF_PATH=$IDF_PATH"
+          python3 --version
+
+      - name: Install Ubuntu-built SDK bundle
+        run: |
+          swift sdk install "sdk/build/${SDK_ID}.tar.gz"
+
+      - name: Header/module coverage probe
+        run: |
+          sdk/check-headers.sh --sdk-id "$SDK_ID"
+
+      - name: Smoke-test cross-compilation (package)
+        run: |
+          swift build -c release --swift-sdk "$SDK_ID" --build-system native
+          test -f .build/riscv32-none-none-eabi/release/Modules/ESPBindings.swiftmodule
+
+      - name: Smoke-test cross-compilation (consumer app)
+        run: |
+          mkdir -p /tmp/esp-smoke/Source/App
+          cd /tmp/esp-smoke
+          cat > Package.swift <<EOF
+          // swift-tools-version: 6.1
+          import PackageDescription
+          let package = Package(
+              name: "App",
+              products: [.library(name: "App", type: .static, targets: ["App"])],
+              dependencies: [.package(name: "swift-esp", path: "$GITHUB_WORKSPACE")],
+              targets: [
+                  .target(name: "App", dependencies: [
+                      .product(name: "ESPCore", package: "swift-esp"),
+                      .product(name: "ESPBindings", package: "swift-esp"),
+                  ], path: "Source/App")
+              ]
+          )
+          EOF
+          cat > Source/App/App.swift <<'EOF'
+          import ESPBindings
+          import ESPCore
+
+          @_cdecl("app_main")
+          func app_main() {
+              try? Nvs.initialize()
+              Logger(label: "ci").info("boot")
+          }
+          EOF
+          swift build -c release --swift-sdk "$SDK_ID" --build-system native
+          test -f .build/riscv32-none-none-eabi/release/libApp.a
+
+      - name: Configure ccache
+        run: |
+          {
+            echo "CCACHE_DIR=$HOME/.ccache"
+            echo "CCACHE_MAXSIZE=500M"
+            echo "IDF_CCACHE_ENABLE=1"
+          } >> "$GITHUB_ENV"
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-esp32c6-idf6.1-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ runner.arch }}-esp32c6-idf6.1-
+
+      - name: Build blink example
+        run: |
+          cd examples/blink
+          idf.py set-target "$IDF_TARGET"
+          idf.py build
+          idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+          TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+          echo "blink image size: ${TOTAL} bytes"
+          test -n "$TOTAL"
+          test "$TOTAL" -lt 300000
+
+      - name: Build Wi-Fi example
+        run: |
+          cd examples/wifi
+          idf.py set-target "$IDF_TARGET"
+          idf.py build
+          idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+          TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+          echo "wifi image size: ${TOTAL} bytes"
+          test -n "$TOTAL"
+          test "$TOTAL" -lt 1048576
+
+      - name: Build Bluetooth example
+        run: |
+          cd examples/bluetooth
+          idf.py set-target "$IDF_TARGET"
+          idf.py build
+          idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+          TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+          echo "bluetooth image size: ${TOTAL} bytes"
+          test -n "$TOTAL"
+          test "$TOTAL" -lt 1048576
+
+  # Publish only the Ubuntu-built bundles, after both Ubuntu builds and the
+  # macOS validation have passed.
+  publish:
+    name: Publish Ubuntu SDK bundles
+    if: github.ref_type == 'tag'
+    needs: [build-esp32c6, build-esp32c3, test-macos]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: Download Ubuntu-built SDK bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-swift-6.4.1-idf6.1-ubuntu-24.04"
+          path: sdk/build
+          merge-multiple: true
+
+      - name: Release (version tags)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sdk/build/*.tar.gz

@@ -1,0 +1,204 @@
+name: Build ESP32 Swift SDK bundle
+description: Build and smoke-test one portable ESP32 Swift SDK bundle on Linux.
+
+inputs:
+  target:
+    description: ESP-IDF target to build
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Swift toolchain (Linux)
+      shell: bash
+      run: |
+        curl -fLo swift.tar.gz "https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2404/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-ubuntu24.04.tar.gz"
+        sudo mkdir -p /opt/swift
+        sudo tar -xzf swift.tar.gz -C /opt/swift --strip-components=2
+        echo "/opt/swift/bin" >> "$GITHUB_PATH"
+
+    - name: Configure ccache
+      shell: bash
+      run: |
+        {
+          echo "CCACHE_DIR=$HOME/.ccache"
+          echo "CCACHE_MAXSIZE=500M"
+          echo "IDF_CCACHE_ENABLE=1"
+        } >> "$GITHUB_ENV"
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-idf6.1-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-idf6.1-
+
+    # The EIM installer checks installed tool versions and reuses matching
+    # toolchains, so caching /tmp/esp skips the download and decompression of
+    # the large GCC and clang archives.
+    - name: Cache ESP-IDF tools
+      uses: actions/cache@v4
+      with:
+        path: /tmp/esp
+        key: eim-tools-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-py312-v0.20.1-idf6.1-v1
+        restore-keys: |
+          eim-tools-${{ runner.os }}-${{ runner.arch }}-${{ inputs.target }}-py312-v0.20.1-idf6.1-
+
+    # The official install action does not expose EIM's --idf-tools or
+    # --idf-features flags. Invoke EIM directly so CI installs only the
+    # toolchain and features this repository actually uses.
+    - name: Install ESP-IDF v6.1
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y git cmake ninja-build wget flex bison gperf ccache \
+          libgcrypt20 libglib2.0-0 libpixman-1-0 libsdl2-2.0-0 libslirp0 \
+          libffi-dev libssl-dev dfu-util libusb-1.0-0 python3 python3-pip \
+          python3-setuptools python3-wheel xz-utils unzip python3-venv
+        curl -fsSL "https://github.com/espressif/idf-im-ui/releases/download/v0.20.1/eim-cli-linux-x64.zip" \
+          -o "$RUNNER_TEMP/eim.zip"
+        unzip -q -o "$RUNNER_TEMP/eim.zip" -d "$RUNNER_TEMP/eim"
+        chmod +x "$RUNNER_TEMP/eim/eim"
+        "$RUNNER_TEMP/eim/eim" install \
+          -i v6.1 \
+          -t "$IDF_TARGET" \
+          -p "$RUNNER_TEMP/esp/idf" \
+          --tool-install-folder-name /tmp/esp \
+          --activation-script-path-override "$HOME/.espressif/tools" \
+          --esp-idf-json-path "$HOME/.espressif/tools" \
+          --idf-tools riscv32-esp-elf,esp-rom-elfs \
+          --idf-features core \
+          --cleanup true \
+          --skip-components-download true \
+          --do-not-track true \
+          -n true \
+          -r true
+        ACTIVATE="$HOME/.espressif/tools/activate_idf_v6.1.sh"
+        ENV_OUT="$("$ACTIVATE" -e)"
+        IDF_PATH="$(printf '%s\n' "$ENV_OUT" | sed -n 's/^IDF_PATH=//p')"
+        IDF_PATH_LINE="$(printf '%s\n' "$ENV_OUT" | sed -n 's/^PATH=//p')"
+        test -n "$IDF_PATH"
+        test -n "$IDF_PATH_LINE"
+        printf '%s\n' "$ENV_OUT" | grep -v -E '^(PATH|SYSTEM_PATH)=' >> "$GITHUB_ENV" || true
+        printf 'PATH=%s/tools:%s:%s\n' "$IDF_PATH" "$IDF_PATH_LINE" "$PATH" >> "$GITHUB_ENV"
+        echo "IDF_PATH=$IDF_PATH"
+        python3 --version
+
+    - name: Build portable SDK bundle
+      shell: bash
+      run: |
+        sdk/make-sdk.sh --target "$IDF_TARGET"
+        swift sdk install "sdk/build/${SDK_ID}.tar.gz"
+
+    - name: Verify bundle portability
+      shell: bash
+      run: |
+        TARBALL="sdk/build/${SDK_ID}.tar.gz"
+        if tar -tvzf "$TARBALL" | awk '$1 ~ /^l/ { found=1 } END { exit !found }'; then
+          echo "error: published bundle contains symlinks" >&2
+          exit 1
+        fi
+        rm -rf /tmp/esp-unpacked
+        mkdir -p /tmp/esp-unpacked
+        tar -xzf "$TARBALL" -C /tmp/esp-unpacked
+        if grep -rIl -e "$HOME" -e "$GITHUB_WORKSPACE" /tmp/esp-unpacked; then
+          echo "error: published bundle references build-machine paths" >&2
+          exit 1
+        fi
+
+    # Import every public module and touch a representative declaration from
+    # each. Missing transitive headers or broken module maps fail here.
+    - name: Header/module coverage probe
+      shell: bash
+      run: |
+        sdk/check-headers.sh --sdk-id "$SDK_ID"
+
+    # Build the actual package, not a stub: this exercises the ClangImporter
+    # over ESP-IDF headers and the ergonomic wrappers.
+    - name: Smoke-test cross-compilation (package)
+      shell: bash
+      run: |
+        swift build -c release --swift-sdk "$SDK_ID" --build-system native
+        test -f .build/riscv32-none-none-eabi/release/Modules/ESPBindings.swiftmodule
+
+    - name: Smoke-test cross-compilation (consumer app)
+      shell: bash
+      run: |
+        mkdir -p /tmp/esp-smoke/Source/App
+        cd /tmp/esp-smoke
+        cat > Package.swift <<EOF
+        // swift-tools-version: 6.1
+        import PackageDescription
+        let package = Package(
+            name: "App",
+            products: [.library(name: "App", type: .static, targets: ["App"])],
+            dependencies: [.package(name: "swift-esp", path: "$GITHUB_WORKSPACE")],
+            targets: [
+                .target(name: "App", dependencies: [
+                    .product(name: "ESPCore", package: "swift-esp"),
+                    .product(name: "ESPBindings", package: "swift-esp"),
+                ], path: "Source/App")
+            ]
+        )
+        EOF
+        cat > Source/App/App.swift <<'EOF'
+        import ESPBindings
+        import ESPCore
+
+        @_cdecl("app_main")
+        func app_main() {
+            try? Nvs.initialize()
+            Logger(label: "ci").info("boot")
+        }
+        EOF
+        swift build -c release --swift-sdk "$SDK_ID" --build-system native
+        test -f .build/riscv32-none-none-eabi/release/libApp.a
+
+    # Build the real, flashable example (WS2812 over RMT). This catches
+    # link-order and driver-header regressions that a library-only build
+    # cannot see.
+    - name: Build blink example
+      shell: bash
+      run: |
+        cd examples/blink
+        idf.py set-target "$IDF_TARGET"
+        idf.py build
+        # Size budget: the demo is ~207 KB; fail on a significant regression.
+        idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+        TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+        echo "blink image size: ${TOTAL} bytes"
+        test -n "$TOTAL"
+        test "$TOTAL" -lt 300000
+
+    - name: Build Wi-Fi example
+      shell: bash
+      run: |
+        cd examples/wifi
+        idf.py set-target "$IDF_TARGET"
+        idf.py build
+        idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+        TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+        echo "wifi image size: ${TOTAL} bytes"
+        test -n "$TOTAL"
+        test "$TOTAL" -lt 1048576
+
+    - name: Build Bluetooth example
+      shell: bash
+      run: |
+        cd examples/bluetooth
+        idf.py set-target "$IDF_TARGET"
+        idf.py build
+        idf.py size --format json2 --output-file "$RUNNER_TEMP/size.json"
+        TOTAL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["total_size"])' "$RUNNER_TEMP/size.json")
+        echo "bluetooth image size: ${TOTAL} bytes"
+        test -n "$TOTAL"
+        test "$TOTAL" -lt 1048576
+
+    - name: Upload SDK bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: "${{ env.ARTIFACT_NAME }}"
+        path: "sdk/build/${{ env.SDK_ID }}.tar.gz"
+        if-no-files-found: error
