@@ -1,6 +1,6 @@
+import ESPCore
 import ESPRMT
 import ESPShims
-import ESPCore
 
 /// The RGB LED on the ESP32-C6-DevKitC-1 is a WS2812 addressable LED on
 /// GPIO 8. It is not a plain GPIO LED: it expects a 24-bit GRB pulse train,
@@ -22,7 +22,8 @@ struct RgbLed {
 
         var channel: rmt_channel_handle_t?
         guard rmt_new_tx_channel(&channelConfig, &channel) == ESP_OK,
-              let channel else { return nil }
+            let channel
+        else { return nil }
 
         var encoderConfig = rmt_bytes_encoder_config_t()
         // WS2812 timings at 10 MHz: T0H=0.3us, T0L=0.9us; T1H=0.9us, T1L=0.3us.
@@ -34,7 +35,8 @@ struct RgbLed {
 
         var encoder: rmt_encoder_handle_t?
         guard rmt_new_bytes_encoder(&encoderConfig, &encoder) == ESP_OK,
-              let encoder else { return nil }
+            let encoder
+        else { return nil }
         guard rmt_enable(channel) == ESP_OK else { return nil }
 
         self.channel = channel
@@ -70,18 +72,18 @@ func app_main() {
     var step = 0
     while true {
         switch step % 4 {
-        case 0:
-            led.set(red: 64, green: 0, blue: 0)
-            logger.info("red")
-        case 1:
-            led.set(red: 0, green: 64, blue: 0)
-            logger.info("green")
-        case 2:
-            led.set(red: 0, green: 0, blue: 64)
-            logger.info("blue")
-        default:
-            led.set(red: 0, green: 0, blue: 0)
-            logger.info("off")
+            case 0:
+                led.set(red: 64, green: 0, blue: 0)
+                logger.info("red")
+            case 1:
+                led.set(red: 0, green: 64, blue: 0)
+                logger.info("green")
+            case 2:
+                led.set(red: 0, green: 0, blue: 64)
+                logger.info("blue")
+            default:
+                led.set(red: 0, green: 0, blue: 0)
+                logger.info("off")
         }
         step += 1
         ESP.delay(milliseconds: 500)

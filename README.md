@@ -9,10 +9,8 @@ building bundles, the module layout, and the development checks.
 
 | Path | Purpose |
 |---|---|
-| `sdk/make-sdk.sh` | Builds the portable Swift SDK bundle |
-| `sdk/eim-env.sh` | Resolves the EIM-selected ESP-IDF installation |
-| `sdk/collect-includes.sh` | Collects ESP-IDF include directories from a scratch project |
-| `sdk/check-headers.sh` | Compiles a probe importing every public module |
+| `sdk/esp-sdk` | Launcher for the Swift host tooling |
+| `sdk/tooling/` | Host-only Swift package: `bundle`, `includes`, `check-headers` |
 | `templates/espidf-project/` | App scaffold used by USAGE.md |
 | `Sources/CESP*` | Raw C targets over ESP-IDF headers (`CESPIDF`, `CESPRMT`, `CESPWiFi`, ...) |
 | `Sources/CESPShims` | C shims for macros and variadic functions |
@@ -22,7 +20,7 @@ building bundles, the module layout, and the development checks.
 
 ## Bundle
 
-`sdk/make-sdk.sh` produces `swift-<swift>_<target>-idf<idf>-<rev>.tar.gz` containing:
+`sdk/esp-sdk bundle` produces `swift-<swift>_<target>-idf<idf>-<rev>.tar.gz` containing:
 
 - ESP-IDF and C-library headers under `include/` and `picolibc/`
 - the GCC sysroot under `sdk-root/`
@@ -31,7 +29,7 @@ building bundles, the module layout, and the development checks.
   bundle-relative include paths
 
 The bundle contains no symlinks and no absolute build-machine paths.
-`make-sdk.sh` fails if either appears. `toolset.json` uses relative paths;
+`esp-sdk bundle` fails if either appears. `toolset.json` uses relative paths;
 `sdk-root`, headers and resources are copied into the bundle.
 
 Bluetooth keeps its original directory layout because `esp_bt.h` uses a
@@ -48,7 +46,7 @@ Prerequisites:
 - Python 3.10+
 
 ```sh
-sdk/make-sdk.sh --target esp32c6
+sdk/esp-sdk bundle --target esp32c6
 swift sdk install sdk/build/swift-6.4.1_esp32c6-idf6.1-0.1.0.tar.gz
 swift sdk list
 ```
@@ -69,10 +67,11 @@ Build the package against an installed bundle:
 swift build -c release --swift-sdk swift-6.4.1_esp32c6-idf6.1-0.1.0 --build-system native
 ```
 
-Run the header/module probe:
+Run the host tooling tests and the header/module probe:
 
 ```sh
-sdk/check-headers.sh
+swift test --package-path sdk/tooling
+sdk/esp-sdk check-headers
 ```
 
 Build the examples against the installed bundle:
@@ -84,8 +83,8 @@ eim shell v6.1
 (cd examples/bluetooth && idf.py set-target esp32c6 && idf.py build)
 ```
 
-`sdk/make-sdk.sh` and `sdk/collect-includes.sh` use the EIM-selected ESP-IDF by
-default; pass `--eim-idf NAME` to use another installed version, or
+`sdk/esp-sdk bundle` and `sdk/esp-sdk includes` use the EIM-selected ESP-IDF
+by default; pass `--eim-idf NAME` to use another installed version, or
 `--idf-path DIR` for a custom checkout.
 
 The examples use a local path dependency for development. The app template in
@@ -100,10 +99,11 @@ re-export the C target.
 To add a peripheral:
 
 1. Add the IDF headers to the relevant `Sources/CESP*/include/CESP*.h`.
-2. Add any missing components to `sdk/collect-includes.sh`.
+2. Add any missing components to `IncludeCollector` in
+   `sdk/tooling/Sources/ESPSDKCore/IncludeCollector.swift`.
 3. Add a Swift wrapper in `Sources/ESP*/` with `@_exported import CESP*`.
 4. Register the target, Swift product and probe import in `Package.swift` and
-   `sdk/check-headers.sh`.
+   `sdk/esp-sdk check-headers`.
 5. Rebuild and reinstall the bundle if the header set changed.
 
 Ergonomic wrappers live in `Sources/ESPBindings/` as ordinary source files.

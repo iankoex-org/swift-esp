@@ -1,6 +1,6 @@
 // CESPBluetooth — Bluetooth (Bluedroid) bindings for ESP-IDF.
 //
-// The headers are vendored by sdk/make-sdk.sh. esp_bt.h contains a relative
+// The headers are vendored by `sdk/esp-sdk bundle`. esp_bt.h contains a relative
 // include into the BT controller tree; the bundle preserves that layout and
 // the compiler wrapper adds the matching search root.
 

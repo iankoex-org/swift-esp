@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.3
 // Blink — a minimal Embedded Swift app for the ESP32-C6-DevKitC-1.
 //
 // Build with ESP-IDF, which cross-compiles this package through the swift-esp
@@ -19,7 +19,7 @@ let package = Package(
     dependencies: [
         // Local checkout while swift-esp is unreleased; switch to a URL
         // dependency once it is published.
-        .package(name: "swift-esp", path: "../../.."),
+        .package(name: "swift-esp", path: "../../..")
     ],
     targets: [
         .target(
@@ -30,6 +30,6 @@ let package = Package(
                 .product(name: "ESPShims", package: "swift-esp"),
                 .product(name: "ESPCore", package: "swift-esp"),
             ]
-        ),
+        )
     ]
 )

@@ -70,7 +70,11 @@ extension Logger {
     ///   - function: The function name (automatically provided by #function).
     ///   - line: The line number (automatically provided by #line).
     public func log(
-        level: Level, message: String..., file: String = #file, function: String = #function, line: Int = #line
+        level: Level,
+        message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
     ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: level, message: messageString)
@@ -83,7 +87,12 @@ extension Logger {
     ///   - file: The file name (automatically provided).
     ///   - function: The function name (automatically provided).
     ///   - line: The line number (automatically provided).
-    public func error(_ message: String..., file: String = #file, function: String = #function, line: Int = #line) {
+    public func error(
+        _ message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: .error, message: messageString)
     }
@@ -95,7 +104,12 @@ extension Logger {
     ///   - file: The file name (automatically provided).
     ///   - function: The function name (automatically provided).
     ///   - line: The line number (automatically provided).
-    public func warning(_ message: String..., file: String = #file, function: String = #function, line: Int = #line) {
+    public func warning(
+        _ message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: .warning, message: messageString)
     }
@@ -107,7 +121,12 @@ extension Logger {
     ///   - file: The file name (automatically provided).
     ///   - function: The function name (automatically provided).
     ///   - line: The line number (automatically provided).
-    public func info(_ message: String..., file: String = #file, function: String = #function, line: Int = #line) {
+    public func info(
+        _ message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: .info, message: messageString)
     }
@@ -119,7 +138,12 @@ extension Logger {
     ///   - file: The file name (automatically provided).
     ///   - function: The function name (automatically provided).
     ///   - line: The line number (automatically provided).
-    public func debug(_ message: String..., file: String = #file, function: String = #function, line: Int = #line) {
+    public func debug(
+        _ message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: .debug, message: messageString)
     }
@@ -131,7 +155,12 @@ extension Logger {
     ///   - file: The file name (automatically provided).
     ///   - function: The function name (automatically provided).
     ///   - line: The line number (automatically provided).
-    public func verbose(_ message: String..., file: String = #file, function: String = #function, line: Int = #line) {
+    public func verbose(
+        _ message: String...,
+        file: String = #file,
+        function: String = #function,
+        line: Int = #line
+    ) {
         let messageString = "\(message.joined(separator: ", ")) • \(function) \(lastComponent(of: file)):\(line)"
         self._log(level: .verbose, message: messageString)
     }

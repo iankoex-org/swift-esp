@@ -1,0 +1,9 @@
+#!/bin/sh
+# Launcher for the host-only Swift tooling in sdk/tooling/.
+#
+# The tooling builds for the host (never for the ESP target) and is kept out
+# of the root package so it does not enter application dependency graphs.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+cd "$ROOT"
+exec swift run --package-path "$ROOT/sdk/tooling" -c release esp-sdk "$@"

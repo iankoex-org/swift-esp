@@ -1,7 +1,7 @@
-import ESPShims
-import ESPWiFi
 import ESPBindings
 import ESPCore
+import ESPShims
+import ESPWiFi
 
 /// Initializes the Wi-Fi station stack and scans for nearby access points,
 /// logging SSID, RSSI and primary channel every five seconds.

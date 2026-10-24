@@ -33,21 +33,21 @@ public struct EspError: Error, Sendable {
     /// Human-readable name for well-known codes.
     public var name: String {
         switch code {
-        case 0: return "ESP_OK"
-        case 1: return "ESP_FAIL"
-        case 0x101: return "ESP_ERR_NO_MEM"
-        case 0x102: return "ESP_ERR_INVALID_ARG"
-        case 0x103: return "ESP_ERR_INVALID_STATE"
-        case 0x105: return "ESP_ERR_NOT_FOUND"
-        case 0x107: return "ESP_ERR_TIMEOUT"
-        case 0x201: return "ESP_ERR_NVS_NOT_INITIALIZED"
-        case 0x202: return "ESP_ERR_NVS_NOT_FOUND"
-        case 0x203: return "ESP_ERR_NVS_TYPE_MISMATCH"
-        case 0x204: return "ESP_ERR_NVS_READ_ONLY"
-        case 0x205: return "ESP_ERR_NVS_NOT_ENOUGH_SPACE"
-        case 0x206: return "ESP_ERR_NVS_INVALID_NAME"
-        case 0x207: return "ESP_ERR_NVS_INVALID_HANDLE"
-        default: return "ESP_ERR_0x" + String(code, radix: 16)
+            case 0: return "ESP_OK"
+            case 1: return "ESP_FAIL"
+            case 0x101: return "ESP_ERR_NO_MEM"
+            case 0x102: return "ESP_ERR_INVALID_ARG"
+            case 0x103: return "ESP_ERR_INVALID_STATE"
+            case 0x105: return "ESP_ERR_NOT_FOUND"
+            case 0x107: return "ESP_ERR_TIMEOUT"
+            case 0x201: return "ESP_ERR_NVS_NOT_INITIALIZED"
+            case 0x202: return "ESP_ERR_NVS_NOT_FOUND"
+            case 0x203: return "ESP_ERR_NVS_TYPE_MISMATCH"
+            case 0x204: return "ESP_ERR_NVS_READ_ONLY"
+            case 0x205: return "ESP_ERR_NVS_NOT_ENOUGH_SPACE"
+            case 0x206: return "ESP_ERR_NVS_INVALID_NAME"
+            case 0x207: return "ESP_ERR_NVS_INVALID_HANDLE"
+            default: return "ESP_ERR_0x" + String(code, radix: 16)
         }
     }
 }

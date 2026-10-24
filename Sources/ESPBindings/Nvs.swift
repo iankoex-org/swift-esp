@@ -63,7 +63,7 @@ public struct NvsHandle: ~Copyable {
         if nvs_get_str(handle, key, nil, &length) != 0 { return nil }
         var buffer = [UInt8](repeating: 0, count: Int(length))
         guard nvs_get_str(handle, key, &buffer, &length) == 0 else { return nil }
-        buffer.removeLast() // trailing NUL
+        buffer.removeLast()  // trailing NUL
         return String(decoding: buffer, as: UTF8.self)
     }
 

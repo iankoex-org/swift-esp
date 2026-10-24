@@ -86,10 +86,14 @@ runs:
         echo "IDF_PATH=$IDF_PATH"
         python3 --version
 
+    - name: Test host tooling
+      shell: bash
+      run: swift test --package-path sdk/tooling
+
     - name: Build portable SDK bundle
       shell: bash
       run: |
-        sdk/make-sdk.sh --target "$IDF_TARGET"
+        sdk/esp-sdk bundle --target "$IDF_TARGET"
         swift sdk install "sdk/build/${SDK_ID}.tar.gz"
 
     - name: Verify bundle portability
@@ -113,7 +117,7 @@ runs:
     - name: Header/module coverage probe
       shell: bash
       run: |
-        sdk/check-headers.sh --sdk-id "$SDK_ID"
+        sdk/esp-sdk check-headers --sdk-id "$SDK_ID"
 
     # Build the actual package, not a stub: this exercises the ClangImporter
     # over ESP-IDF headers and the ergonomic wrappers.
@@ -129,7 +133,7 @@ runs:
         mkdir -p /tmp/esp-smoke/Source/App
         cd /tmp/esp-smoke
         cat > Package.swift <<EOF
-        // swift-tools-version: 6.1
+        // swift-tools-version: 6.3
         import PackageDescription
         let package = Package(
             name: "App",

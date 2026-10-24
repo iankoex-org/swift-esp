@@ -3,7 +3,7 @@
 Build ESP32 firmware in Embedded Swift against ESP-IDF. This guide assumes a
 clean host and uses the prebuilt SDK bundles from GitHub release assets.
 
-Do not run `sdk/make-sdk.sh` for app development. Install the prebuilt SDK and
+Do not run `sdk/esp-sdk bundle` for app development. Install the prebuilt SDK and
 add the Git dependency; clone the repository only to copy the project template
 or examples.
 
@@ -137,7 +137,7 @@ ESP-IDF project, copy `templates/espidf-project/main/CMakeLists.txt` into its
 ## 5. Package.swift
 
 ```swift
-// swift-tools-version: 6.1
+// swift-tools-version: 6.3
 import PackageDescription
 
 let package = Package(

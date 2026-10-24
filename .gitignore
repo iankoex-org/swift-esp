@@ -9,3 +9,7 @@ __cmake_systeminformation/
 
 # keep example build configuration
 !examples/*/sdkconfig.defaults
+
+# Generated when tooling resolves the template package
+templates/espidf-project/main/Package.resolved
+.swift-version

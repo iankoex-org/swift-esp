@@ -1,12 +1,12 @@
 // Umbrella header for CESPIDF — raw C bindings over ESP-IDF via the ClangImporter.
 //
-// The headers are vendored into the Swift SDK bundle by sdk/make-sdk.sh (see
-// sdk/collect-includes.sh for the component list). Add the headers for the
+// The headers are vendored into the Swift SDK bundle by `sdk/esp-sdk bundle`
+// (see IncludeCollector.swift for the component list). Add the headers for the
 // IDF components your app uses here; the importer turns them into Swift types
 // automatically.
 //
 // NOTE: keep this list to components whose headers resolve with the include
-// set collected from an app entry-point build (sdk/collect-includes.sh).
+// set collected from an app entry-point build (`sdk/esp-sdk includes`).
 // Wi-Fi is exposed by CESPWiFi: esp_wifi.h pulls wpa_supplicant internals and
 // is kept out of the core umbrella.
 
@@ -30,7 +30,7 @@
 #include "freertos/semphr.h"
 
 // Peripheral drivers. These headers are vendored into the SDK bundle by
-// sdk/collect-includes.sh from the esp_driver_*/esp_hal_* components.
+// `sdk/esp-sdk bundle` from the esp_driver_*/esp_hal_* components.
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/i2c_master.h"

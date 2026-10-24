@@ -1,7 +1,7 @@
-import ESPBluetooth
-import ESPShims
 import ESPBindings
+import ESPBluetooth
 import ESPCore
+import ESPShims
 
 /// Starts a BLE peripheral that advertises as "Swift-ESP".
 @_cdecl("app_main")

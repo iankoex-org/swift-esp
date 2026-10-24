@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.3
 import PackageDescription
 
 let package = Package(
@@ -15,6 +15,6 @@ let package = Package(
                 .product(name: "ESPBindings", package: "swift-esp"),
                 .product(name: "ESPCore", package: "swift-esp"),
             ]
-        ),
+        )
     ]
 )

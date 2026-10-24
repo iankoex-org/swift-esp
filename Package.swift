@@ -1,4 +1,4 @@
-// swift-tools-version:6.1
+// swift-tools-version: 6.3
 // Swift bindings and tooling for ESP32 (RISC-V) development.
 //
 // Naming:
